@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SRM Full Stack Challenge</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-6 font-sans">
+    <div class="max-w-4xl mx-auto bg-white p-8 rounded shadow-md">
+        <h1 class="text-2xl font-bold mb-4 text-blue-600">Challenge Dashboard</h1>
+        
+        <div class="mb-6">
+            <label class="block font-semibold mb-2">Input Edges (JSON array of strings):</label>
+            <textarea id="jsonInput" rows="5" class="w-full border rounded p-2 text-gray-800" placeholder='["A->B", "A->C", "B->D"]'>[
+  "A->B", "A->C", "B->D", "D->E", "invalid", "A->B", "X->Y", "Y->Z", "Z->X", "F->G", "H->G"
+]</textarea>
+            <button id="submitBtn" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">Execute /bfhl</button>
+        </div>
+
+        <div id="loading" class="hidden text-gray-600 font-semibold mb-4">Processing...</div>
+        <div id="error" class="hidden text-red-600 font-semibold mb-4"></div>
+
+        <div id="results" class="hidden space-y-6">
+            <div class="grid grid-cols-2 gap-4 bg-blue-50 p-4 rounded text-sm">
+                <div><span class="font-bold">User API:</span> <span id="r_user" class="text-gray-700"></span></div>
+                <div><span class="font-bold">Email:</span> <span id="r_email" class="text-gray-700"></span></div>
+                <div><span class="font-bold">Roll Number:</span> <span id="r_roll" class="text-gray-700"></span></div>
+                <div><span class="font-bold">Success:</span> <span id="r_success" class="text-green-600 font-bold"></span></div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-6">
+                <div>
+                    <h3 class="font-bold text-red-600 border-b pb-1 mb-2">Invalid Entries</h3>
+                    <pre id="r_invalid" class="bg-gray-100 p-2 text-sm rounded max-h-32 overflow-auto"></pre>
+                </div>
+                <div>
+                    <h3 class="font-bold text-orange-600 border-b pb-1 mb-2">Duplicate Edges</h3>
+                    <pre id="r_duplicates" class="bg-gray-100 p-2 text-sm rounded max-h-32 overflow-auto"></pre>
+                </div>
+            </div>
+
+            <div>
+                <h3 class="font-bold text-gray-800 border-b pb-1 mb-2 text-lg">Summary</h3>
+                <div class="bg-gray-50 p-4 rounded grid grid-cols-3 gap-4 text-center">
+                    <div>
+                        <div class="text-xs uppercase text-gray-500 font-bold">Total Trees</div>
+                        <div id="sum_trees" class="text-xl text-blue-600 font-bold">0</div>
+                    </div>
+                    <div>
+                        <div class="text-xs uppercase text-gray-500 font-bold">Total Cycles</div>
+                        <div id="sum_cycles" class="text-xl text-red-600 font-bold">0</div>
+                    </div>
+                    <div>
+                        <div class="text-xs uppercase text-gray-500 font-bold">Largest Tree Root</div>
+                        <div id="sum_largest" class="text-xl text-green-600 font-bold">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <h3 class="font-bold text-gray-800 border-b pb-1 mb-2 text-lg">Hierarchies (Trees / Cycles)</h3>
+                <div id="hierarchiesList" class="space-y-4"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('submitBtn').addEventListener('click', async () => {
+            const inputVal = document.getElementById('jsonInput').value;
+            const errorDiv = document.getElementById('error');
+            const resultsDiv = document.getElementById('results');
+            const loadingDiv = document.getElementById('loading');
+            
+            errorDiv.classList.add('hidden');
+            resultsDiv.classList.add('hidden');
+            
+            let parsedData;
+            try {
+                parsedData = JSON.parse(inputVal);
+            } catch (e) {
+                errorDiv.textContent = "Invalid JSON format in the input.";
+                errorDiv.classList.remove('hidden');
+                return;
+            }
+
+            loadingDiv.classList.remove('hidden');
+
+            try {
+                // Point this to your backend if deployed (e.g. https://your-app.onrender.com/bfhl)
+                const res = await fetch('http://localhost:3000/bfhl', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ data: parsedData })
+                });
+
+                const json = await res.json();
+                loadingDiv.classList.add('hidden');
+
+                if (!res.ok) {
+                    errorDiv.textContent = "API Error: " + (json.error || res.statusText);
+                    errorDiv.classList.remove('hidden');
+                    return;
+                }
+
+                // Render Summary
+                document.getElementById('r_user').textContent = json.user_id;
+                document.getElementById('r_email').textContent = json.email_id;
+                document.getElementById('r_roll').textContent = json.college_roll_number;
+                document.getElementById('r_success').textContent = String(json.is_success);
+
+                document.getElementById('r_invalid').textContent = JSON.stringify(json.invalid_entries, null, 2);
+                document.getElementById('r_duplicates').textContent = JSON.stringify(json.duplicate_edges, null, 2);
+
+                document.getElementById('sum_trees').textContent = json.summary.total_trees;
+                document.getElementById('sum_cycles').textContent = json.summary.total_cycles;
+                document.getElementById('sum_largest').textContent = json.summary.largest_tree_root || 'None';
+
+                // Render Hierarchies
+                const hListDiv = document.getElementById('hierarchiesList');
+                hListDiv.innerHTML = '';
+                json.hierarchies.forEach((h, index) => {
+                    const card = document.createElement('div');
+                    card.className = "border rounded p-4 " + (h.has_cycle ? "bg-red-50 border-red-200" : "bg-white");
+                    
+                    const header = document.createElement('div');
+                    header.className = "flex justify-between items-center mb-2";
+                    header.innerHTML = `
+                        <span class="font-bold text-lg">Root: ${h.root}</span>
+                        <div class="text-sm space-x-2">
+                            ${h.has_cycle 
+                                ? '<span class="bg-red-100 text-red-800 px-2 py-1 rounded">Cycle Detected</span>' 
+                                : `<span class="bg-green-100 text-green-800 px-2 py-1 rounded">Tree</span>
+                                   <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded">Depth: ${h.depth}</span>`
+                            }
+                        </div>
+                    `;
+                    
+                    const treePre = document.createElement('pre');
+                    treePre.className = "bg-gray-100 p-2 text-xs rounded overflow-auto mt-2";
+                    treePre.textContent = JSON.stringify(h.tree, null, 2);
+
+                    card.appendChild(header);
+                    card.appendChild(treePre);
+                    hListDiv.appendChild(card);
+                });
+
+                resultsDiv.classList.remove('hidden');
+
+            } catch (err) {
+                loadingDiv.classList.add('hidden');
+                errorDiv.textContent = "Network Error: Could not connect to backend. Is the server running on port 3000?";
+                errorDiv.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+</html>
