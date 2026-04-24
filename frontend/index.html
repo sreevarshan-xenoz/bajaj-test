@@ -87,8 +87,8 @@
             loadingDiv.classList.remove('hidden');
 
             try {
-                // Point this to your backend if deployed (e.g. https://your-app.onrender.com/bfhl)
-                const res = await fetch('http://localhost:3000/bfhl', {
+                // Automatically points to the current host (works locally and when deployed)
+                const res = await fetch('/bfhl', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ data: parsedData })
