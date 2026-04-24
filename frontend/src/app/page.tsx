@@ -28,13 +28,11 @@ export default function Home() {
 // We default the user input value to a nice combination of valid and failing edges
 // This allows evaluators to visually verify how the logic catches cycles and groups discrete clusters initially
   const [inputVal, setInputVal] = useState(`[
-  "A->B", "A->B", "A->B",
-  "A->B", "B->C", "C->A",
-  "A->D", "B->D", "C->D",
-  "Z->X", "X->Y", "Y->Z",
-  "A->B", "C->D", "E->F",
-  "A->B", "A->C", "C->D", "D->E",
-  " A->B ", "A->a", "AA->B", "A->", ""
+  "A->B", "A->C", "B->D", "C->E", "E->F",
+  "X->Y", "Y->Z", "Z->X",
+  "P->Q", "Q->R",
+  "G->H", "G->H", "G->I",
+  "hello", "1->2", "A->"
 ]`);
   // Simple state tracks for network operations
   const [loading, setLoading] = useState(false);
@@ -114,10 +112,10 @@ export default function Home() {
         {results && (
           <div className="space-y-6 mt-6">
             <div className="grid grid-cols-2 gap-4 bg-blue-50 p-4 rounded text-sm">
-              <div><span className="font-bold">User API:</span> <span className="text-gray-700">{results.user_id}</span></div>
+              <div><span className="font-bold">User ID:</span> <span className="text-gray-700">{results.user_id}</span></div>
               <div><span className="font-bold">Email:</span> <span className="text-gray-700">{results.email_id}</span></div>
               <div><span className="font-bold">Roll Number:</span> <span className="text-gray-700">{results.college_roll_number}</span></div>
-              <div><span className="font-bold">Success:</span> <span className="text-green-600 font-bold">{String(results.is_success)}</span></div>
+              <div><span className="font-bold">API Status:</span> <span className="text-green-600 font-bold">Success</span></div>
             </div>
 
             <div className="grid grid-cols-2 gap-6">
