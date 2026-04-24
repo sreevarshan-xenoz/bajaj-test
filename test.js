@@ -1,17 +1,7 @@
-const express = require('express');
-const cors = require('cors');
-
-const path = require('path');
-
-const app = express();
-app.use(cors());
-app.use(express.json());
-
-const PORT = process.env.PORT || 3001;
-
-const USER_ID = "sreevarshan_15112005";
-const EMAIL = "sreevarshan1511@gmail.com";
-const ROLL = "RA2311026020061";
+// REPLACE THESE WITH YOUR ACTUAL DETAILS
+const USER_ID = "johndoe_17091999";
+const EMAIL = "john.doe@college.edu";
+const ROLL = "21CS1001";
 
 function processData(data) {
     const invalid_entries = [];
@@ -37,7 +27,7 @@ function processData(data) {
         const u = match[1];
         const v = match[2];
         
-        if (u === v) {
+        if (u === v) { // self-loop
             invalid_entries.push(item);
             return;
         }
@@ -169,28 +159,14 @@ function processData(data) {
     };
 }
 
-app.post('/bfhl', (req, res) => {
-    try {
-        const { data } = req.body;
-        if (!Array.isArray(data)) {
-            return res.status(400).json({ is_success: false, error: "Invalid input" });
-        }
+const req = {
+ "data": [
+ "A->B", "A->C", "B->D", "C->E", "E->F",
+ "X->Y", "Y->Z", "Z->X",
+ "P->Q", "Q->R",
+ "G->H", "G->H", "G->I",
+ "hello", "1->2", "A->"
+ ]
+};
 
-        const result = processData(data);
-
-        res.json({
-            is_success: true,
-            user_id: USER_ID,
-            email_id: EMAIL,
-            college_roll_number: ROLL,
-            ...result
-        });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ is_success: false, error: "Internal Server Error" });
-    }
-});
-
-app.listen(PORT, () => {
-    console.log(`Backend server running on http://localhost:${PORT}`);
-});
+console.log(JSON.stringify(processData(req.data), null, 2));
