@@ -58,8 +58,8 @@ export default function Home() {
     setLoading(true);
 
     try {
-      // Connect to whatever deployed backend handles the logic, or default to the standard local Express env
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      // Use same-origin API by default so Vercel deployment works out of the box.
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
       
       const response = await fetch(`${apiUrl}/bfhl`, {
         method: 'POST',
@@ -78,14 +78,14 @@ export default function Home() {
       setResults(jsonData); // Propagate all the tree data out to the DOM components 
     } catch (networkErr) {
       setLoading(false);
-      setError("Network Error: Could not connect to backend. Is the server actually running on port 3001?");
+      setError("Network Error: Could not reach the API endpoint.");
     }
   };
 
   return (
     <main className="min-h-[100vh] bg-gray-100 p-6 font-sans text-gray-900">
       <div className="max-w-4xl mx-auto bg-white p-8 rounded shadow-md">
-        <h1 className="text-2xl font-bold mb-4 text-blue-600">Challenge Dashboard (Next.js)</h1>
+        <h1 className="text-2xl font-bold mb-4 text-blue-600">Challenge Dashboard</h1>
         
         <div className="mb-6">
           <label className="block font-semibold mb-2">Input Edges (JSON array of strings):</label>
