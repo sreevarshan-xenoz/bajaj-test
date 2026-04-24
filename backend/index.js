@@ -9,85 +9,108 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3001;
 
+// My personal details for the SRM challenge evaluation
 const USER_ID = "sreevarshan_15112005";
-const EMAIL = "sreevarshan1511@gmail.com";
+const EMAIL = "sv1251@srmist.edu.in";
 const ROLL = "RA2311026020061";
 
 function processData(data) {
+    // Arrays and sets to keep track of the challenge requirements
     const invalid_entries = [];
     const duplicate_edges = [];
+    
     const seenEdges = new Set();
     const reportedDuplicates = new Set();
+    
     const childToParent = new Map();
-    const adj = new Map();
+    const adjacencyList = new Map(); // using map for adjacency list representations
     const allNodes = new Set();
 
     data.forEach(item => {
+        // Double check types before we start string manipulations
         if (typeof item !== 'string') {
             invalid_entries.push(String(item));
             return;
         }
-        const trimmed = item.trim();
-        const match = trimmed.match(/^([A-Z])->([A-Z])$/);
+        
+        const trimmedEdge = item.trim();
+        
+        // Spec strictly says single uppercase letters separated by ->
+        const match = trimmedEdge.match(/^([A-Z])->([A-Z])$/);
+        
         if (!match) {
             invalid_entries.push(item);
             return;
         }
         
-        const u = match[1];
-        const v = match[2];
+        const fromNode = match[1];
+        const toNode = match[2];
         
-        if (u === v) {
+        // Prevent self loops e.g. A->A
+        if (fromNode === toNode) {
             invalid_entries.push(item);
             return;
         }
 
-        const edgeStr = `${u}->${v}`;
-        if (seenEdges.has(edgeStr)) {
-            if (!reportedDuplicates.has(edgeStr)) {
+        const edgeString = `${fromNode}->${toNode}`;
+        
+        // Handle duplicate edge case correctly (only report it once)
+        if (seenEdges.has(edgeString)) {
+            if (!reportedDuplicates.has(edgeString)) {
                 duplicate_edges.push(item);
-                reportedDuplicates.add(edgeStr);
+                reportedDuplicates.add(edgeString);
             }
-            return;
+            return; // Skip adding to graph logic naturally
         }
-        seenEdges.add(edgeStr);
+        seenEdges.add(edgeString);
 
-        if (!childToParent.has(v)) {
-            childToParent.set(v, u);
-            if (!adj.has(u)) adj.set(u, []);
-            adj.get(u).push(v);
+        // Keep the first parent only. If a node already has a parent, ignore any subsequent parent attempting to claim it.
+        if (!childToParent.has(toNode)) {
+            childToParent.set(toNode, fromNode);
             
-            allNodes.add(u);
-            allNodes.add(v);
+            // Build adjacency list for tree construction later
+            if (!adjacencyList.has(fromNode)) {
+                adjacencyList.set(fromNode, []);
+            }
+            adjacencyList.get(fromNode).push(toNode);
+            
+            // Collect unique nodes 
+            allNodes.add(fromNode);
+            allNodes.add(toNode);
         }
     });
 
-    const undirectedAdj = new Map();
-    allNodes.forEach(n => undirectedAdj.set(n, []));
+    // Grouping discrete components together as an undirected graph traversal
+    const undirectedGraph = new Map();
+    allNodes.forEach(node => undirectedGraph.set(node, []));
+    
     childToParent.forEach((parent, child) => {
-        undirectedAdj.get(parent).push(child);
-        undirectedAdj.get(child).push(parent);
+        undirectedGraph.get(parent).push(child);
+        undirectedGraph.get(child).push(parent);
     });
 
-    const visitedGlobal = new Set();
-    const components = [];
+    const globalVisitedNodes = new Set();
+    const isolatedComponents = [];
 
-    allNodes.forEach(start => {
-        if (!visitedGlobal.has(start)) {
-            const compNodes = [];
-            const q = [start];
-            visitedGlobal.add(start);
-            while(q.length > 0) {
-                const curr = q.shift();
-                compNodes.push(curr);
-                for (const neighbor of undirectedAdj.get(curr)) {
-                    if (!visitedGlobal.has(neighbor)) {
-                        visitedGlobal.add(neighbor);
-                        q.push(neighbor);
+    // Standard BFS to grab clustered hierarchies
+    allNodes.forEach(startNode => {
+        if (!globalVisitedNodes.has(startNode)) {
+            const currentComponent = [];
+            const queue = [startNode];
+            globalVisitedNodes.add(startNode);
+            
+            while(queue.length > 0) {
+                const current = queue.shift();
+                currentComponent.push(current);
+                
+                for (const neighbor of undirectedGraph.get(current)) {
+                    if (!globalVisitedNodes.has(neighbor)) {
+                        globalVisitedNodes.add(neighbor);
+                        queue.push(neighbor);
                     }
                 }
             }
-            components.push(compNodes);
+            isolatedComponents.push(currentComponent);
         }
     });
 
@@ -97,66 +120,79 @@ function processData(data) {
     let largest_tree_root = null;
     let max_depth_global = -1;
 
-    components.forEach(comp => {
-        let possibleRoots = comp.filter(n => !childToParent.has(n));
-        let root;
+    // Process each isolated cluster independently 
+    isolatedComponents.forEach(component => {
+        // Need to find the actual root element. Elements with no parent in this cluster are the roots.
+        const possibleRoots = component.filter(node => !childToParent.has(node));
+        let rootNode;
+        
         if (possibleRoots.length > 0) {
-            possibleRoots.sort(); 
-            root = possibleRoots[0];
+            possibleRoots.sort(); // Lexicographical ordering as per spec tie breakers
+            rootNode = possibleRoots[0];
         } else {
-            comp.sort();
-            root = comp[0];
+            // A pure cycle has absolutely no root naturally, so fallback to lexicographically smallest node
+            component.sort();
+            rootNode = component[0];
         }
 
-        const visited = new Set();
-        const recStack = new Set();
-        let has_cycle = false;
-        let max_depth = 0;
+        const visitedInTree = new Set();
+        const recursionStack = new Set();
+        let hasCycle = false;
+        let maxDepthTracker = 0;
 
-        function buildTree(node, depth) {
-            visited.add(node);
-            recStack.add(node);
-            max_depth = Math.max(max_depth, depth);
+        // Recursive DFS to find cycles and compute deepest subtree simultaneously 
+        function recursivelyBuildTree(node, currentDepth) {
+            visitedInTree.add(node);
+            recursionStack.add(node);
+            
+            maxDepthTracker = Math.max(maxDepthTracker, currentDepth);
 
-            const subtree = {};
-            const children = adj.get(node) || [];
-            for (const child of children) {
-                if (!visited.has(child)) {
-                    subtree[child] = buildTree(child, depth + 1);
-                } else if (recStack.has(child)) {
-                    has_cycle = true;
+            const subtreeObj = {};
+            const childNodes = adjacencyList.get(node) || [];
+            
+            for (const child of childNodes) {
+                if (!visitedInTree.has(child)) {
+                    subtreeObj[child] = recursivelyBuildTree(child, currentDepth + 1);
+                } else if (recursionStack.has(child)) {
+                    // Back edges denote cycles!
+                    hasCycle = true;
                 }
             }
-            recStack.delete(node);
-            return subtree;
+            
+            recursionStack.delete(node); // pop from tracking stack
+            return subtreeObj;
         }
 
-        const treeStr = buildTree(root, 1);
+        const treeStructure = recursivelyBuildTree(rootNode, 1);
 
-        if (has_cycle) {
+        if (hasCycle) {
             hierarchies.push({
-                root,
+                root: rootNode,
                 tree: {},
                 has_cycle: true
             });
             total_cycles++;
         } else {
             hierarchies.push({
-                root,
-                tree: { [root]: treeStr },
-                depth: max_depth
+                root: rootNode,
+                tree: { [rootNode]: treeStructure },
+                depth: maxDepthTracker
             });
             total_trees++;
 
-            if (max_depth > max_depth_global) {
-                max_depth_global = max_depth;
-                largest_tree_root = root;
-            } else if (max_depth === max_depth_global && largest_tree_root) {
-                if (root < largest_tree_root) largest_tree_root = root;
+            // Tracking the global largest tree for the summary response
+            if (maxDepthTracker > max_depth_global) {
+                max_depth_global = maxDepthTracker;
+                largest_tree_root = rootNode;
+            } else if (maxDepthTracker === max_depth_global && largest_tree_root) {
+                if (rootNode < largest_tree_root) {
+                    largest_tree_root = rootNode;
+                }
             }
         }
     });
 
+    // Formatting exactly as required
     return {
         invalid_entries,
         duplicate_edges,

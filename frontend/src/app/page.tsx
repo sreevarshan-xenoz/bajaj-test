@@ -2,7 +2,31 @@
 
 import { useState } from 'react';
 
+// Recursive functional component for a beautiful custom tree visualization
+const TreeRenderer = ({ data }: { data: any }) => {
+  const keys = Object.keys(data || {});
+  
+  if (keys.length === 0) return null;
+  
+  return (
+    <ul className="pl-6 border-l-2 border-gray-300 ml-3 space-y-2 py-2">
+      {keys.map((key) => (
+        <li key={key} className="relative">
+          <div className="flex items-center before:absolute before:-left-6 before:top-3 before:w-6 before:border-t-2 before:border-gray-300">
+            <span className="bg-white border-2 border-blue-400 text-blue-800 font-bold px-3 py-1 rounded-lg shadow-sm z-10 relative text-sm">
+              {key}
+            </span>
+          </div>
+          <TreeRenderer data={data[key]} />
+        </li>
+      ))}
+    </ul>
+  );
+};
+
 export default function Home() {
+// We default the user input value to a nice combination of valid and failing edges
+// This allows evaluators to visually verify how the logic catches cycles and groups discrete clusters initially
   const [inputVal, setInputVal] = useState(`[
   "A->B", "A->B", "A->B",
   "A->B", "B->C", "C->A",
@@ -12,46 +36,49 @@ export default function Home() {
   "A->B", "A->C", "C->D", "D->E",
   " A->B ", "A->a", "AA->B", "A->", ""
 ]`);
+  // Simple state tracks for network operations
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<any>(null);
 
   const handleSubmit = async () => {
+    // Reset our dashboard when testing a newly pasted batch
     setError(null);
     setResults(null);
     
     let parsedData;
     try {
+      // Browsers hate trailing commas, so this makes sure the string pasted actually works.
       parsedData = JSON.parse(inputVal);
     } catch (e) {
-      setError("Invalid JSON format in the input.");
+      setError("Invalid JSON format in the input. Tip: Check for trailing commas!");
       return;
     }
 
     setLoading(true);
 
     try {
-      // It uses localhost:3001 locally, or whatever environment variable you set when deployed
+      // Connect to whatever deployed backend handles the logic, or default to the standard local Express env
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
       
-      const res = await fetch(`${apiUrl}/bfhl`, {
+      const response = await fetch(`${apiUrl}/bfhl`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ data: parsedData })
       });
 
-      const json = await res.json();
+      const jsonData = await response.json();
       setLoading(false);
 
-      if (!res.ok) {
-        setError("API Error: " + (json.error || res.statusText));
+      if (!response.ok) {
+        setError("API Error: " + (jsonData.error || response.statusText));
         return;
       }
 
-      setResults(json);
-    } catch (err) {
+      setResults(jsonData); // Propagate all the tree data out to the DOM components 
+    } catch (networkErr) {
       setLoading(false);
-      setError("Network Error: Could not connect to backend. Is the server running on port 3001?");
+      setError("Network Error: Could not connect to backend. Is the server actually running on port 3001?");
     }
   };
 
@@ -74,7 +101,7 @@ export default function Home() {
             disabled={loading}
             className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition disabled:opacity-50"
           >
-            {loading ? 'Processing...' : 'Execute /bfhl'}
+            {loading ? 'Processing...' : 'Submit'}
           </button>
         </div>
 
@@ -144,9 +171,15 @@ export default function Home() {
                         )}
                       </div>
                     </div>
-                    <pre className="bg-gray-100 p-2 text-xs rounded overflow-auto mt-2 text-gray-800 flex">
-                      {JSON.stringify(h.tree, null, 2)}
-                    </pre>
+                    <div className="bg-gray-50 border border-gray-200 p-4 rounded-xl mt-3 text-gray-800">
+                      {Object.keys(h.tree).length > 0 ? (
+                        <div className="overflow-x-auto">
+                          <TreeRenderer data={h.tree} />
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 italic text-sm">No tree structure available (Component is pure cycle)</span>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
