@@ -4,6 +4,12 @@ const USER_ID = 'sreevarshan_15112005';
 const EMAIL = 'sv1251@srmist.edu.in';
 const ROLL = 'RA2311026020061';
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
 function processData(data: unknown[]) {
   const invalid_entries: string[] = [];
   const duplicate_edges: string[] = [];
@@ -183,19 +189,22 @@ export async function POST(request: Request) {
     const { data } = body;
 
     if (!Array.isArray(data)) {
-      return NextResponse.json({ is_success: false, error: 'Invalid input' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid input' }, { status: 400, headers: corsHeaders });
     }
 
     const result = processData(data);
 
     return NextResponse.json({
-      is_success: true,
       user_id: USER_ID,
       email_id: EMAIL,
       college_roll_number: ROLL,
       ...result,
-    });
+    }, { headers: corsHeaders });
   } catch {
-    return NextResponse.json({ is_success: false, error: 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500, headers: corsHeaders });
   }
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: corsHeaders });
 }

@@ -1,1 +1,1 @@
-export { POST } from '../api/bfhl/route';
+export { OPTIONS, POST } from '../api/bfhl/route';
